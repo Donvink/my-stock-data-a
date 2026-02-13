@@ -25,6 +25,9 @@ jobs:
         run: pip install akshare pandas
 
       - name: Run Python Script
+        env:
+            # 这行代码是将 GitHub 存储的加密 Secret 映射为环境变量
+            TUSH_TOKEN: ${{ secrets.TUSH_TOKEN }}
         run: python fetch_data.py
 
       - name: Push CSV back to Repo
