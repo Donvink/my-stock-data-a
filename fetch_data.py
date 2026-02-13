@@ -10,7 +10,7 @@ def fetch_with_retry(max_retries=5):
         try:
             print(f"尝试第 {i+1} 次抓取...")
             # 核心接口
-            df = ak.stock_zh_a_spot_em()
+            df = ak.stock_zh_a_spot()
             
             if df is not None and not df.empty:
                 print("✅ 数据抓取成功！")
