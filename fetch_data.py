@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 import time
+import pytz
 
 
 def load_local_csv(file_path=""):
@@ -22,8 +23,8 @@ def stock_summary(date="20260213", save_dir='data'):
     # 1. 各大指数摘要数据
     index_df = load_local_csv(file_path)
     if index_df is not None:
-        total_amount = index_df.loc[len(index_df) - 1, '成交额']
-        return total_amount
+        # total_amount = index_df.loc[len(index_df) - 1, '成交额']
+        return index_df
     else:
         try:
             # index_df = ak.stock_zh_index_spot_em()
@@ -66,7 +67,7 @@ def stock_summary(date="20260213", save_dir='data'):
     print("-" * 30)
     print(result[['序号', '代码', '名称', '最新价', '涨跌幅', '成交额(亿元)']])
     print("-" * 30)
-    return total_amount
+    return result
 
 def stock_zt_dt_pool(date="20260213", save_dir='data'):
     """获取涨停/跌停个股数据"""
@@ -353,6 +354,9 @@ def get_lhb_data(date="20260213", save_dir='data'):
             lhb_df = lhb_df_ori[~lhb_df_ori[col_name].str.contains('ST', case=False, na=False)].copy()
             # 股票去重
             lhb_df.drop_duplicates(subset=[col_name], inplace=True)
+            lhb_df.drop(columns=['序号'], inplace=True, errors='ignore')
+            lhb_df.reset_index(drop=True, inplace=True)
+            lhb_df.insert(0, '序号', range(1, len(lhb_df) + 1))
             # print(lhb_df_ori)
             lhb_df.to_csv(file_path, index=False, encoding="utf-8-sig")
         except Exception as e:
@@ -476,6 +480,95 @@ def get_watchlist(top_amount_stocks_df,
 
     return watchlist1_df, watchlist2_df
 
+def create_hugo_post(
+        index_df, up_count, down_count,
+        zt_pool_df, dt_pool_df, zb_pool_df,
+        top_amount_stocks_df,
+        concept_summary_df, concept_cons_topn,
+        lhb_df,
+        watchlist1_df, watchlist2_df,
+        save_dir='content/posts'):
+    """生成符合瑞士时区且防 Hugo 屏蔽的文章"""
+    # 确保目录存在
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # 1. 处理瑞士时区
+    swiss_tz = pytz.timezone('Europe/Zurich')
+    # 2. 将时间往前拨 10 分钟，确保 100% 判定为“已发布”
+    safe_now = datetime.now(swiss_tz) - timedelta(minutes=10)
+    
+    # 生成文件名和 ISO 时间戳
+    date_filename = safe_now.strftime("%Y-%m-%d")
+    # 格式示例: 2026-02-12T20:15:00+01:00
+    formatted_date = safe_now.strftime("%Y-%m-%dT%H:%M:%S%z")
+    
+    filename = f"{save_dir}/stock-analysis-{date_filename}.md"
+    display_title = f"A股全市场复盘：{date_filename} 深度解析及AI洞察"
+
+    content = f"""---
+title: "{display_title}"
+date: {formatted_date}
+tags: ["每日复盘", "重点个股", "行业板块", "市场分析"]
+categories: ["每日更新"]
+showToc: true
+draft: false
+---
+
+
+### 📊 市场核心快照
+- **上证指数**: {index_df.iloc[0]['最新价']} ({index_df.iloc[0]['涨跌幅']}%)
+- **全市场成交总额**: {index_df.iloc[0]['成交额(亿元)']:.2f} 亿
+- **涨跌比**: {up_count} / {down_count}
+- **涨停/跌停/炸板数**:{len(zt_pool_df)} / {len(dt_pool_df)} / {len(zb_pool_df)}
+
+### 🔍 成交额前二十个股
+
+{top_amount_stocks_df.to_markdown(index=False)}
+
+### 🏆 行业板块分析
+- **前五概念板块**（按涨幅排序）
+
+{concept_summary_df.to_markdown(index=False)}
+
+- **各板块板块涨幅靠前个股**（按涨幅排序）
+
+{concept_cons_topn[0].to_markdown(index=False)}
+
+{concept_cons_topn[1].to_markdown(index=False)}
+
+{concept_cons_topn[2].to_markdown(index=False)}
+
+{concept_cons_topn[3].to_markdown(index=False)}
+
+{concept_cons_topn[4].to_markdown(index=False)}
+
+### 🚀 龙虎榜
+
+{lhb_df.to_markdown(index=False)}
+
+### ⭐ 重点个股 Watchlist
+- **大额异动池**（成交额前二十，且在涨/跌/炸/龙虎榜/前五板块成员中）
+
+{watchlist1_df.to_markdown(index=False)}
+
+- **风口涨停池**（涨停/炸板，且在前五板块成员中）
+
+{watchlist2_df.to_markdown(index=False)}
+
+---
+*
+注：
+1. 数据来源：AKShare。
+2. 本文由AI辅助生成，旨在提供市场洞察和数据分析，非投资建议。
+3. 声明：投资有风险，入市需谨慎。本文内容仅供参考，不构成任何投资建议或推荐。请根据自身情况做出独立判断。
+*
+"""
+    
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"成功生成报告: {filename}")
+    print(f"文章发布时间设为: {formatted_date}")
+
 def fetch_and_save():
     """主函数：获取数据并保存"""
     latest_date = get_latest_date()
@@ -488,7 +581,7 @@ def fetch_and_save():
     os.makedirs(save_dir, exist_ok=True)
 
     # 获取大盘数据并保存
-    total_amount = stock_summary(date=latest_date, save_dir=save_dir)
+    index_df = stock_summary(date=latest_date, save_dir=save_dir)
 
     # 获取涨停数据并保存
     zt_pool_df, dt_pool_df, zb_pool_df = stock_zt_dt_pool(date=latest_date, save_dir=save_dir)
@@ -530,6 +623,23 @@ def fetch_and_save():
     # TODO: 获取资讯
 
     # TODO: 分析报告
+
+    # 生成Hugo规格的 Markdown 报告
+    create_hugo_post(
+        index_df=index_df,
+        zt_pool_df=zt_pool_df,
+        dt_pool_df=dt_pool_df,
+        zb_pool_df=zb_pool_df,
+        up_count=up_count,
+        down_count=down_count,
+        top_amount_stocks_df=top_amount_stocks_df,
+        concept_summary_df=concept_summary_df,
+        concept_cons_topn=concept_cons_topn,
+        lhb_df=lhb_df,
+        watchlist1_df=watchlist1_df,
+        watchlist2_df=watchlist2_df,
+        save_dir='content/posts'
+    )
 
     return True
     
