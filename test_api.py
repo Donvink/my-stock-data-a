@@ -2,6 +2,14 @@ import akshare as ak
 import time
 
 
+
+# 个股信息查询-东方财富
+# info_df = ak.stock_individual_info_em(symbol='300017')
+# print(info_df)
+# stock_individual_basic_info_xq_df = ak.stock_individual_basic_info_xq(symbol="SZ002837")
+# print(stock_individual_basic_info_xq_df)
+
+
 # 个股行情报价 - 东方财富
 # stock_bid_ask_em_df = ak.stock_bid_ask_em(symbol="000001")
 # print(stock_bid_ask_em_df)
