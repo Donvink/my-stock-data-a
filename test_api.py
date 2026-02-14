@@ -132,6 +132,13 @@ import time
 # print(stock_lhb_ggtj_sina_df)
 
 
+# 龙虎榜-东财
+# stock_lhb_detail_em_df = ak.stock_lhb_detail_em(start_date="20260214", end_date="20260214")
+# print(stock_lhb_detail_em_df)
+# stock_lhb_stock_detail_em_df = ak.stock_lhb_stock_detail_em(symbol="600077", date="20070416", flag="买入")
+# print(stock_lhb_stock_detail_em_df)
+
+
 # # 同花顺-同花顺行业一览表
 # stock_board_industry_summary_ths_df = ak.stock_board_industry_summary_ths()
 # print(stock_board_industry_summary_ths_df)
